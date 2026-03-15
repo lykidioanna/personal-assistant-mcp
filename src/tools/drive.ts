@@ -44,37 +44,37 @@ export async function handleDriveTool(name: string, args: Record<string, any>) {
 
   if (name === 'search_drive') {
     let mimeFilter = '';
-    if (args.fileType === 'doc') mimeFilter = " and mimeType='application/vnd.google-apps.document'";
-    else if (args.fileType === 'sheet') mimeFilter = " and mimeType='application/vnd.google-apps.spreadsheet'";
-    else if (args.fileType === 'pdf') mimeFilter = " and mimeType='application/pdf'";
+    if (args.fileType === 'doc') {
+      mimeFilter = " and mimeType='application/vnd.google-apps.document'";
+    } else if (args.fileType === 'sheet') {
+      mimeFilter = " and mimeType='application/vnd.google-apps.spreadsheet'";
+    } else if (args.fileType === 'pdf') {
+      mimeFilter = " and mimeType='application/pdf'";
+    }
 
+    const q = "fullText contains '" + args.query + "'" + mimeFilter + " and trashed=false";
     const res = await drive.files.list({
-      q: "fullText contains '" + args.query + "'" + mimeFilter + " and trashed=false",
+      q: q,
       pageSize: args.maxResults || 10,
       fields: 'files(id, name, mimeType, modifiedTime, webViewLink)',
     });
 
     const files = res.data.files || [];
-    if (files.length === 0) return { content: [{ type: 'text', text: 'No files found.' }] };
+    if (files.length === 0) {
+      return { content: [{ type: 'text', text: 'No files found.' }] };
+    }
 
-    const formatted = files.map(f => {
+    const lines: string[] = [];
+    for (const f of files) {
       let type = '📁 File';
-      if (f.mimeType?.includes('document')) type = '📝 Doc';
-      else if (f.mimeType?.includes('spreadsheet')) type = '📊 Sheet';
-      else if (f.mimeType?.includes('pdf')) type = '📄 PDF';
-      return type + ': ' + f.name + '\n   ID: ' + f.id + '\n   Modified: ' + f.modifiedTime + '\n   Link: ' + f.webViewLink;
-    });
+      if (f.mimeType && f.mimeType.includes('document')) { type = '📝 Doc'; }
+      else if (f.mimeType && f.mimeType.includes('spreadsheet')) { type = '📊 Sheet'; }
+      else if (f.mimeType && f.mimeType.includes('pdf')) { type = '📄 PDF'; }
+      lines.push(type + ': ' + f.name + '\n   ID: ' + f.id + '\n   Modified: ' + f.modifiedTime + '\n   Link: ' + f.webViewLink);
+    }
 
-    return { content: [{ type: 'text', text: formatted.join('\n\n') }] };
+    return { content: [{ type: 'text', text: lines.join('\n\n') }] };
   }
 
   if (name === 'read_document') {
     const docs = getDocsClient();
-    const res = await docs.documents.get({ documentId: args.documentId });
-    const content = res.data.body?.content || [];
-
-    const text = content.map((block: any) => {
-      return block.paragraph?.elements?.map((el: any) => el.textRun?.content || '').join('') || '';
-    }).join('');
-
-    return { co
