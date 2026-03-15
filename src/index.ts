@@ -45,16 +45,14 @@ for (const tool of allTools) {
   });
 }
 
-const transport = new StreamableHTTPServerTransport({ path: '/mcp' });
-
-const httpServer = http.createServer((req, res) => {
-  transport.handleRequest(req, res);
-});
-
 const PORT = process.env.PORT || 3000;
+
+const httpServer = http.createServer(async (req, res) => {
+  const transport = new StreamableHTTPServerTransport({});
+  await server.connect(transport);
+  await transport.handleRequest(req, res);
+});
 
 httpServer.listen(PORT, () => {
   console.log('Personal Assistant MCP server running on port ' + PORT);
 });
-
-server.connect(transport).catch(console.error);
