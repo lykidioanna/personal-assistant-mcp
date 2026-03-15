@@ -7,6 +7,7 @@ import { gmailTools, handleGmailTool } from './tools/gmail.js';
 import { calendarTools, handleCalendarTool } from './tools/calendar.js';
 import { driveTools, handleDriveTool } from './tools/drive.js';
 import { mapsTools, handleMapsTool } from './tools/maps.js';
+import { timetableTools, handleTimetableTool } from './tools/timetable.js';
 
 dotenv.config();
 
@@ -24,6 +25,8 @@ async function callTool(toolName: string, args: Record<string, any>): Promise<To
       result = await handleDriveTool(toolName, args);
     } else if (mapsTools.find(t => t.name === toolName)) {
       result = await handleMapsTool(toolName, args);
+    } else if (timetableTools.find(t => t.name === toolName)) {
+      result = await handleTimetableTool(toolName, args);
     } else {
       throw new Error('Tool not found: ' + toolName);
     }
@@ -44,7 +47,7 @@ function createServer() {
     version: '1.0.0',
   });
 
-  const allTools = [...gmailTools, ...calendarTools, ...driveTools, ...mapsTools];
+  const allTools = [...gmailTools, ...calendarTools, ...driveTools, ...mapsTools, ...timetableTools];
 
   for (const tool of allTools) {
     const toolName = tool.name;
