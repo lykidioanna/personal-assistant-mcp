@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
 import * as dotenv from 'dotenv';
 
 import { gmailTools, handleGmailTool } from './tools/gmail.js';
@@ -14,28 +15,35 @@ const server = new McpServer({
   version: '1.0.0',
 });
 
+function registerTool(
+  name: string,
+  description: string,
+  handler: (args: Record<string, any>) => Promise<any>
+) {
+  server.tool(name, description, {}, async (args: any) => {
+    try {
+      const result = await handler(args);
+      return result;
+    } catch (error: any) {
+      return {
+        content: [{ type: 'text' as const, text: 'Error: ' + error.message }],
+        isError: true,
+      };
+    }
+  });
+}
+
 const allTools = [...gmailTools, ...calendarTools, ...driveTools, ...mapsTools];
 
 for (const tool of allTools) {
-  server.tool(
-    tool.name,
-    tool.description,
-    tool.inputSchema.properties as any,
-    async (args: Record<string, any>) => {
-      try {
-        if (gmailTools.find(t => t.name === tool.name)) return await handleGmailTool(tool.name, args);
-        if (calendarTools.find(t => t.name === tool.name)) return await handleCalendarTool(tool.name, args);
-        if (driveTools.find(t => t.name === tool.name)) return await handleDriveTool(tool.name, args);
-        if (mapsTools.find(t => t.name === tool.name)) return await handleMapsTool(tool.name, args);
-        throw new Error('Tool not found: ' + tool.name);
-      } catch (error: any) {
-        return {
-          content: [{ type: 'text', text: 'Error: ' + error.message }],
-          isError: true,
-        };
-      }
-    }
-  );
+  const toolName = tool.name;
+  registerTool(toolName, tool.description, async (args: Record<string, any>) => {
+    if (gmailTools.find(t => t.name === toolName)) return await handleGmailTool(toolName, args);
+    if (calendarTools.find(t => t.name === toolName)) return await handleCalendarTool(toolName, args);
+    if (driveTools.find(t => t.name === toolName)) return await handleDriveTool(toolName, args);
+    if (mapsTools.find(t => t.name === toolName)) return await handleMapsTool(toolName, args);
+    throw new Error('Tool not found: ' + toolName);
+  });
 }
 
 async function main() {
