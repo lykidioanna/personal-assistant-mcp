@@ -8,7 +8,7 @@ export const driveTools = [
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Search query (file name or content)' },
-        fileType: { type: 'string', description: 'Filter by type: "doc", "sheet", "pdf", or leave empty for all' },
+        fileType: { type: 'string', description: 'Filter by type: doc, sheet, pdf, or leave empty for all' },
         maxResults: { type: 'number', description: 'Maximum number of results (default 10)' },
       },
       required: ['query'],
@@ -32,7 +32,7 @@ export const driveTools = [
       type: 'object',
       properties: {
         spreadsheetId: { type: 'string', description: 'The Google Sheets ID (from the URL)' },
-        range: { type: 'string', description: 'Cell range to read (e.g. "Sheet1!A1:E20"), defaults to first sheet' },
+        range: { type: 'string', description: 'Cell range to read e.g. Sheet1!A1:E20' },
       },
       required: ['spreadsheetId'],
     },
@@ -49,7 +49,7 @@ export async function handleDriveTool(name: string, args: Record<string, any>) {
     else if (args.fileType === 'pdf') mimeFilter = " and mimeType='application/pdf'";
 
     const res = await drive.files.list({
-      q: `fullText contains '${args.query}'${mimeFilter} and trashed=false`,
+      q: "fullText contains '" + args.query + "'" + mimeFilter + " and trashed=false",
       pageSize: args.maxResults || 10,
       fields: 'files(id, name, mimeType, modifiedTime, webViewLink)',
     });
@@ -58,7 +58,23 @@ export async function handleDriveTool(name: string, args: Record<string, any>) {
     if (files.length === 0) return { content: [{ type: 'text', text: 'No files found.' }] };
 
     const formatted = files.map(f => {
-      const type = f.mimeType?.includes('document') ? '📝 Doc' :
-        f.mimeType?.includes('spreadsheet') ? '📊 Sheet' :
-          f.mimeType?.includes('pdf') ? '📄 PDF' : '📁 File';
-      return `${type
+      let type = '📁 File';
+      if (f.mimeType?.includes('document')) type = '📝 Doc';
+      else if (f.mimeType?.includes('spreadsheet')) type = '📊 Sheet';
+      else if (f.mimeType?.includes('pdf')) type = '📄 PDF';
+      return type + ': ' + f.name + '\n   ID: ' + f.id + '\n   Modified: ' + f.modifiedTime + '\n   Link: ' + f.webViewLink;
+    });
+
+    return { content: [{ type: 'text', text: formatted.join('\n\n') }] };
+  }
+
+  if (name === 'read_document') {
+    const docs = getDocsClient();
+    const res = await docs.documents.get({ documentId: args.documentId });
+    const content = res.data.body?.content || [];
+
+    const text = content.map((block: any) => {
+      return block.paragraph?.elements?.map((el: any) => el.textRun?.content || '').join('') || '';
+    }).join('');
+
+    return { co
