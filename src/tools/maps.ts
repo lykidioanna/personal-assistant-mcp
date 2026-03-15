@@ -7,8 +7,8 @@ export const mapsTools = [
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'What to search for (e.g. "Italian restaurants near Clapham")' },
-        location: { type: 'string', description: 'Location to search near (optional, defaults to London)' },
+        query: { type: 'string', description: 'What to search for e.g. Italian restaurants near Clapham' },
+        location: { type: 'string', description: 'Location to search near (optional)' },
       },
       required: ['query'],
     },
@@ -32,7 +32,7 @@ export async function handleMapsTool(name: string, args: Record<string, any>) {
   const apiKey = process.env.MAPS_API_KEY;
 
   if (name === 'search_places') {
-    const query = args.location ? `${args.query} near ${args.location}` : args.query;
+    const query = args.location ? args.query + ' near ' + args.location : args.query;
     const res = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
       params: { query, key: apiKey },
     });
@@ -41,8 +41,12 @@ export async function handleMapsTool(name: string, args: Record<string, any>) {
     if (places.length === 0) return { content: [{ type: 'text', text: 'No places found.' }] };
 
     const formatted = places.map((p: any) => {
-      const rating = p.rating ? `⭐ ${p.rating}/5 (${p.user_ratings_total} reviews)` : 'No rating';
-      return `📍 ${p.name}\n   ${p.formatted_address}\n   ${rating}${p.opening_hours?.open_now !== undefined ? `\n   ${p.opening_hours.open_now ? '🟢 Open now' : '🔴 Closed'}` : ''}`;
+      const rating = p.rating ? '⭐ ' + p.rating + '/5 (' + p.user_ratings_total + ' reviews)' : 'No rating';
+      let line = '📍 ' + p.name + '\n   ' + p.formatted_address + '\n   ' + rating;
+      if (p.opening_hours?.open_now !== undefined) {
+        line += '\n   ' + (p.opening_hours.open_now ? '🟢 Open now' : '🔴 Closed');
+      }
+      return line;
     });
 
     return { content: [{ type: 'text', text: formatted.join('\n\n') }] };
@@ -64,10 +68,16 @@ export async function handleMapsTool(name: string, args: Record<string, any>) {
 
     const leg = route.legs[0];
     const steps = leg.steps.map((s: any, i: number) =>
-      `${i + 1}. ${s.html_instructions.replace(/<[^>]+>/g, '')} (${s.distance.text})`
+      (i + 1) + '. ' + s.html_instructions.replace(/<[^>]+>/g, '') + ' (' + s.distance.text + ')'
     ).join('\n');
 
     return {
       content: [{
         type: 'text',
-        text: `🗺️ ${args.origin} → ${args.destination}\n\nDistance: ${leg.distance.text}\nDuration: ${leg.duration.text}\nMode: ${mode}\n\nDi
+        text: '🗺️ ' + args.origin + ' to ' + args.destination + '\n\nDistance: ' + leg.distance.text + '\nDuration: ' + leg.duration.text + '\nMode: ' + mode + '\n\nDirections:\n' + steps,
+      }],
+    };
+  }
+
+  throw new Error('Unknown maps tool: ' + name);
+}
