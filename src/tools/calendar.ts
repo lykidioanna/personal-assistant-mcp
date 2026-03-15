@@ -131,4 +131,16 @@ export async function handleCalendarTool(name: string, args: Record<string, any>
     const remainingMinutes = (dayEnd.getTime() - current.getTime()) / 60000;
     if (remainingMinutes >= duration) {
       const from = current.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-      const to = dayEnd.to
+      const to = dayEnd.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      freeSlots.push(from + ' - ' + to + ' (' + Math.floor(remainingMinutes) + ' min)');
+    }
+
+    if (freeSlots.length === 0) {
+      return { content: [{ type: 'text', text: 'No free slots found on ' + date + '.' }] };
+    }
+
+    return { content: [{ type: 'text', text: 'Free slots on ' + date + ':\n' + freeSlots.join('\n') }] };
+  }
+
+  throw new Error('Unknown calendar tool: ' + name);
+}
