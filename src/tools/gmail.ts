@@ -7,7 +7,7 @@ export const gmailTools = [
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Gmail search query (e.g. "from:john subject:meeting")' },
+        query: { type: 'string', description: 'Gmail search query' },
         maxResults: { type: 'number', description: 'Maximum number of results (default 10)' },
       },
       required: ['query'],
@@ -55,8 +55,61 @@ export async function handleGmailTool(name: string, args: Record<string, any>) {
 
     const summaries = await Promise.all(
       messages.map(async (m) => {
-        const msg = await gmail.users.messages.get({ userId: 'me', id: m.id!, format: 'metadata', metadataHeaders: ['Subject', 'From', 'Date'] });
+        const msg = await gmail.users.messages.get({
+          userId: 'me',
+          id: m.id!,
+          format: 'metadata',
+          metadataHeaders: ['Subject', 'From', 'Date'],
+        });
         const headers = msg.data.payload?.headers || [];
         const subject = headers.find(h => h.name === 'Subject')?.value || '(no subject)';
         const from = headers.find(h => h.name === 'From')?.value || '(unknown)';
         const date = headers.find(h => h.name === 'Date')?.value || '';
+        return 'ID: ' + m.id + '\nFrom: ' + from + '\nDate: ' + date + '\nSubject: ' + subject;
+      })
+    );
+
+    return { content: [{ type: 'text', text: summaries.join('\n\n---\n\n') }] };
+  }
+
+  if (name === 'read_email') {
+    const msg = await gmail.users.messages.get({ userId: 'me', id: args.messageId, format: 'full' });
+    const headers = msg.data.payload?.headers || [];
+    const subject = headers.find(h => h.name === 'Subject')?.value || '(no subject)';
+    const from = headers.find(h => h.name === 'From')?.value || '';
+    const date = headers.find(h => h.name === 'Date')?.value || '';
+
+    let body = '';
+    const parts = msg.data.payload?.parts || [];
+    const textPart = parts.find(p => p.mimeType === 'text/plain');
+    if (textPart?.body?.data) {
+      body = Buffer.from(textPart.body.data, 'base64').toString('utf-8');
+    } else if (msg.data.payload?.body?.data) {
+      body = Buffer.from(msg.data.payload.body.data, 'base64').toString('utf-8');
+    }
+
+    return {
+      content: [{
+        type: 'text',
+        text: 'From: ' + from + '\nDate: ' + date + '\nSubject: ' + subject + '\n\n' + body,
+      }],
+    };
+  }
+
+  if (name === 'send_email') {
+    const messageParts = [
+      'To: ' + args.to,
+      'Subject: ' + args.subject,
+      args.cc ? 'Cc: ' + args.cc : '',
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      args.body,
+    ].filter(Boolean);
+
+    const raw = Buffer.from(messageParts.join('\n')).toString('base64url');
+    await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+    return { content: [{ type: 'text', text: 'Email sent to ' + args.to }] };
+  }
+
+  throw new Error('Unknown Gmail tool: ' + name);
+}
