@@ -19,7 +19,7 @@ export const calendarTools = [
       type: 'object',
       properties: {
         title: { type: 'string', description: 'Event title' },
-        startDateTime: { type: 'string', description: 'Start date/time in ISO format (e.g. 2025-04-01T10:00:00)' },
+        startDateTime: { type: 'string', description: 'Start date/time in ISO format' },
         endDateTime: { type: 'string', description: 'End date/time in ISO format' },
         description: { type: 'string', description: 'Event description (optional)' },
         location: { type: 'string', description: 'Event location (optional)' },
@@ -66,7 +66,10 @@ export async function handleCalendarTool(name: string, args: Record<string, any>
     const formatted = events.map(e => {
       const start = e.start?.dateTime || e.start?.date || '';
       const end = e.end?.dateTime || e.end?.date || '';
-      return `📅 ${e.summary}\n   Start: ${start}\n   End: ${end}${e.location ? `\n   Location: ${e.location}` : ''}${e.description ? `\n   Notes: ${e.description}` : ''}`;
+      let line = '📅 ' + e.summary + '\n   Start: ' + start + '\n   End: ' + end;
+      if (e.location) line += '\n   Location: ' + e.location;
+      if (e.description) line += '\n   Notes: ' + e.description;
+      return line;
     });
 
     return { content: [{ type: 'text', text: formatted.join('\n\n') }] };
@@ -86,4 +89,34 @@ export async function handleCalendarTool(name: string, args: Record<string, any>
     }
 
     const res = await calendar.events.insert({ calendarId: 'primary', requestBody: event });
-    return { content: [{ type: 'text', text: `Event created: ${res.data.summary}
+    return { content: [{ type: 'text', text: 'Event created: ' + res.data.summary + ' (' + res.data.htmlLink + ')' }] };
+  }
+
+  if (name === 'find_free_time') {
+    const date = args.date;
+    const duration = args.durationMinutes || 60;
+    const dayStart = new Date(date + 'T08:00:00');
+    const dayEnd = new Date(date + 'T20:00:00');
+
+    const res = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin: dayStart.toISOString(),
+      timeMax: dayEnd.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    const events = res.data.items || [];
+    const busySlots = events.map(e => ({
+      start: new Date(e.start?.dateTime || e.start?.date || ''),
+      end: new Date(e.end?.dateTime || e.end?.date || ''),
+    }));
+
+    const freeSlots: string[] = [];
+    let current = dayStart;
+
+    for (const busy of busySlots) {
+      const gapMinutes = (busy.start.getTime() - current.getTime()) / 60000;
+      if (gapMinutes >= duration) {
+        const from = current.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const to = busy.start.toLocaleTimeString(
