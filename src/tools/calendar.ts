@@ -61,18 +61,21 @@ export async function handleCalendarTool(name: string, args: Record<string, any>
     });
 
     const events = res.data.items || [];
-    if (events.length === 0) return { content: [{ type: 'text', text: 'No upcoming events found.' }] };
+    if (events.length === 0) {
+      return { content: [{ type: 'text', text: 'No upcoming events found.' }] };
+    }
 
-    const formatted = events.map(e => {
+    const lines: string[] = [];
+    for (const e of events) {
       const start = e.start?.dateTime || e.start?.date || '';
-      const end = e.end?.dateTime || e.end?.date || '';
-      let line = '📅 ' + e.summary + '\n   Start: ' + start + '\n   End: ' + end;
-      if (e.location) line += '\n   Location: ' + e.location;
-      if (e.description) line += '\n   Notes: ' + e.description;
-      return line;
-    });
+      const finish = e.end?.dateTime || e.end?.date || '';
+      let line = '📅 ' + e.summary + '\n   Start: ' + start + '\n   End: ' + finish;
+      if (e.location) { line = line + '\n   Location: ' + e.location; }
+      if (e.description) { line = line + '\n   Notes: ' + e.description; }
+      lines.push(line);
+    }
 
-    return { content: [{ type: 'text', text: formatted.join('\n\n') }] };
+    return { content: [{ type: 'text', text: lines.join('\n\n') }] };
   }
 
   if (name === 'create_event') {
@@ -82,14 +85,14 @@ export async function handleCalendarTool(name: string, args: Record<string, any>
       end: { dateTime: args.endDateTime, timeZone: 'Europe/London' },
     };
 
-    if (args.description) event.description = args.description;
-    if (args.location) event.location = args.location;
+    if (args.description) { event.description = args.description; }
+    if (args.location) { event.location = args.location; }
     if (args.attendees) {
       event.attendees = args.attendees.split(',').map((e: string) => ({ email: e.trim() }));
     }
 
     const res = await calendar.events.insert({ calendarId: 'primary', requestBody: event });
-    return { content: [{ type: 'text', text: 'Event created: ' + res.data.summary + ' (' + res.data.htmlLink + ')' }] };
+    return { content: [{ type: 'text', text: 'Event created: ' + res.data.summary }] };
   }
 
   if (name === 'find_free_time') {
@@ -119,4 +122,13 @@ export async function handleCalendarTool(name: string, args: Record<string, any>
       const gapMinutes = (busy.start.getTime() - current.getTime()) / 60000;
       if (gapMinutes >= duration) {
         const from = current.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-        const to = busy.start.toLocaleTimeString(
+        const to = busy.start.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        freeSlots.push(from + ' - ' + to + ' (' + Math.floor(gapMinutes) + ' min)');
+      }
+      if (busy.end > current) { current = busy.end; }
+    }
+
+    const remainingMinutes = (dayEnd.getTime() - current.getTime()) / 60000;
+    if (remainingMinutes >= duration) {
+      const from = current.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const to = dayEnd.to
