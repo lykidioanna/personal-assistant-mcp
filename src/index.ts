@@ -48,9 +48,30 @@ for (const tool of allTools) {
 const PORT = process.env.PORT || 3000;
 
 const httpServer = http.createServer(async (req, res) => {
-  const transport = new StreamableHTTPServerTransport({});
-  await server.connect(transport);
-  await transport.handleRequest(req, res);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok' }));
+    return;
+  }
+
+  try {
+    const transport = new StreamableHTTPServerTransport({});
+    await server.connect(transport);
+    await transport.handleRequest(req, res);
+  } catch (error: any) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: error.message }));
+  }
 });
 
 httpServer.listen(PORT, () => {
