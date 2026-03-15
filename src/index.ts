@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { z } from 'zod';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import * as dotenv from 'dotenv';
+import * as http from 'http';
 
 import { gmailTools, handleGmailTool } from './tools/gmail.js';
 import { calendarTools, handleCalendarTool } from './tools/calendar.js';
@@ -22,8 +22,7 @@ function registerTool(
 ) {
   server.tool(name, description, {}, async (args: any) => {
     try {
-      const result = await handler(args);
-      return result;
+      return await handler(args);
     } catch (error: any) {
       return {
         content: [{ type: 'text' as const, text: 'Error: ' + error.message }],
@@ -46,10 +45,16 @@ for (const tool of allTools) {
   });
 }
 
-async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('Personal Assistant MCP server running');
-}
+const transport = new StreamableHTTPServerTransport({ path: '/mcp' });
 
-main().catch(console.error);
+const httpServer = http.createServer((req, res) => {
+  transport.handleRequest(req, res);
+});
+
+const PORT = process.env.PORT || 3000;
+
+httpServer.listen(PORT, () => {
+  console.log('Personal Assistant MCP server running on port ' + PORT);
+});
+
+server.connect(transport).catch(console.error);
