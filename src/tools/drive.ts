@@ -67,9 +67,13 @@ export async function handleDriveTool(name: string, args: Record<string, any>) {
     const lines: string[] = [];
     for (const f of files) {
       let type = '📁 File';
-      if (f.mimeType && f.mimeType.includes('document')) { type = '📝 Doc'; }
-      else if (f.mimeType && f.mimeType.includes('spreadsheet')) { type = '📊 Sheet'; }
-      else if (f.mimeType && f.mimeType.includes('pdf')) { type = '📄 PDF'; }
+      if (f.mimeType && f.mimeType.includes('document')) {
+        type = '📝 Doc';
+      } else if (f.mimeType && f.mimeType.includes('spreadsheet')) {
+        type = '📊 Sheet';
+      } else if (f.mimeType && f.mimeType.includes('pdf')) {
+        type = '📄 PDF';
+      }
       lines.push(type + ': ' + f.name + '\n   ID: ' + f.id + '\n   Modified: ' + f.modifiedTime + '\n   Link: ' + f.webViewLink);
     }
 
@@ -78,3 +82,37 @@ export async function handleDriveTool(name: string, args: Record<string, any>) {
 
   if (name === 'read_document') {
     const docs = getDocsClient();
+    const res = await docs.documents.get({ documentId: args.documentId });
+    const content = res.data.body?.content || [];
+
+    const parts: string[] = [];
+    for (const block of content) {
+      if (block.paragraph && block.paragraph.elements) {
+        const text = block.paragraph.elements.map((el: any) => el.textRun?.content || '').join('');
+        parts.push(text);
+      }
+    }
+
+    const text = parts.join('').trim();
+    return { content: [{ type: 'text', text: text || 'Document appears to be empty.' }] };
+  }
+
+  if (name === 'read_spreadsheet') {
+    const sheets = getSheetsClient();
+    const range = args.range || 'A1:Z1000';
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: args.spreadsheetId,
+      range: range,
+    });
+
+    const rows = res.data.values || [];
+    if (rows.length === 0) {
+      return { content: [{ type: 'text', text: 'Spreadsheet appears to be empty.' }] };
+    }
+
+    const formatted = rows.map((row: any[]) => row.join('\t')).join('\n');
+    return { content: [{ type: 'text', text: formatted }] };
+  }
+
+  throw new Error('Unknown drive tool: ' + name);
+}
