@@ -10,6 +10,34 @@ import { mapsTools, handleMapsTool } from './tools/maps.js';
 
 dotenv.config();
 
+type TextContent = { type: 'text'; text: string };
+type ToolResult = { content: TextContent[]; isError?: boolean };
+
+async function callTool(toolName: string, args: Record<string, any>): Promise<ToolResult> {
+  try {
+    let result: any;
+    if (gmailTools.find(t => t.name === toolName)) {
+      result = await handleGmailTool(toolName, args);
+    } else if (calendarTools.find(t => t.name === toolName)) {
+      result = await handleCalendarTool(toolName, args);
+    } else if (driveTools.find(t => t.name === toolName)) {
+      result = await handleDriveTool(toolName, args);
+    } else if (mapsTools.find(t => t.name === toolName)) {
+      result = await handleMapsTool(toolName, args);
+    } else {
+      throw new Error('Tool not found: ' + toolName);
+    }
+    return {
+      content: result.content.map((c: any) => ({ type: 'text' as const, text: String(c.text) })),
+    };
+  } catch (error: any) {
+    return {
+      content: [{ type: 'text' as const, text: 'Error: ' + error.message }],
+      isError: true,
+    };
+  }
+}
+
 function createServer() {
   const server = new McpServer({
     name: 'personal-assistant',
@@ -20,20 +48,14 @@ function createServer() {
 
   for (const tool of allTools) {
     const toolName = tool.name;
-    server.tool(toolName, tool.description, {}, async (args: any) => {
-      try {
-        if (gmailTools.find(t => t.name === toolName)) return await handleGmailTool(toolName, args);
-        if (calendarTools.find(t => t.name === toolName)) return await handleCalendarTool(toolName, args);
-        if (driveTools.find(t => t.name === toolName)) return await handleDriveTool(toolName, args);
-        if (mapsTools.find(t => t.name === toolName)) return await handleMapsTool(toolName, args);
-        throw new Error('Tool not found: ' + toolName);
-      } catch (error: any) {
-        return {
-          content: [{ type: 'text' as const, text: 'Error: ' + error.message }],
-          isError: true,
-        };
+    server.tool(
+      toolName,
+      tool.description,
+      {},
+      async (_args: any): Promise<ToolResult> => {
+        return callTool(toolName, _args);
       }
-    });
+    );
   }
 
   return server;
