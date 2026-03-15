@@ -26,4 +26,22 @@ for (const tool of allTools) {
         if (gmailTools.find(t => t.name === tool.name)) return await handleGmailTool(tool.name, args);
         if (calendarTools.find(t => t.name === tool.name)) return await handleCalendarTool(tool.name, args);
         if (driveTools.find(t => t.name === tool.name)) return await handleDriveTool(tool.name, args);
-        if (mapsToo
+        if (mapsTools.find(t => t.name === tool.name)) return await handleMapsTool(tool.name, args);
+        throw new Error('Tool not found: ' + tool.name);
+      } catch (error: any) {
+        return {
+          content: [{ type: 'text', text: 'Error: ' + error.message }],
+          isError: true,
+        };
+      }
+    }
+  );
+}
+
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error('Personal Assistant MCP server running');
+}
+
+main().catch(console.error);
